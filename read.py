@@ -8,7 +8,7 @@ def read_bytes(f, num):
         raise EOFError("Unexpected end of file.")
     return bytes_read
 
-def TAG_End(f):
+def TAG_End():
     return None
 
 def TAG_Byte(f):
@@ -43,11 +43,23 @@ def TAG_String(f):
     return read_bytes(f, string_len).decode('utf-8')
 
 def TAG_List(f):
+    global depth
+    
     TAG_id = struct.unpack('b', read_bytes(f, 1))[0]
-    return TAG_id, struct.unpack('>i', read_bytes(f, 4))[0]
+    array_len = struct.unpack('>i', read_bytes(f, 4))[0]
+    TAG_type_list = [0]*array_len
 
+    depth += 1
+
+    for i in TAG_type_list:
+        TAG_type_list[i] =  read_TAG(f, TAG_id)
+
+    depth -= 1
+
+    return 'Empty' if array_len == 0 else ''
+        
 def TAG_Compound(f):
-    value = False
+    value = ''
     while True:
         if value == None:
             break
@@ -72,23 +84,28 @@ def TAG_Long_Array(f):
     return long_list
 
 
-def read_TAG(f):
+def read_TAG(f, TAG_List_id = None):
     global depth
-    TAG_id = TAG_Byte(f)
-       
+
+    if TAG_List_id == None:
+        TAG_id = TAG_Byte(f)
+    else:
+        TAG_id = TAG_List_id
+
     if TAG_id == 0:
         #display_structure('End TAG', '', depth)
         depth -= 1
-        return TAG_End(f)
+        return TAG_End()
 
-    name = TAG_String(f)
+    if TAG_List_id == None:
+        name = TAG_String(f)
 
     if TAG_id == 10:
-        display_structure(name, '', depth)
+        display_structure(str(TAG_id) + ' ' + name, '', depth)
         depth += 1
 
         TAG_Compound(f)
-        return False
+        return ''
 
     if TAG_id == 1:
         value = TAG_Byte(f)
@@ -112,8 +129,9 @@ def read_TAG(f):
         value = TAG_Int_Array(f)
     elif TAG_id == 12:
         value = TAG_Long_Array(f)
-    
-    display_structure(name, value, depth)
+
+    display_structure(str(TAG_id) + ' ' + name, value, depth)
+
     return value
 
 
@@ -126,7 +144,7 @@ if __name__ != '__main__':
     def display_structure(name, value, depth):
         pass
 
-filename = 'new2.schem'
+filename = 'test.schem'
 with gzip.open(filename, 'rb') as f:
     depth = 0
     read_TAG(f)
